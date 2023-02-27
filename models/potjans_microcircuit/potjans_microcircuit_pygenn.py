@@ -28,7 +28,7 @@ MEASURE_TIMING = True
 PROCEDURAL_CONNECTIVITY = False
 
 # Should we rebuild the model rather than loading previous version
-BUILD_MODEL = False
+BUILD_MODEL = True
 
 # Should we use zero-copy for legacy spike recording?
 ZERO_COPY = False
