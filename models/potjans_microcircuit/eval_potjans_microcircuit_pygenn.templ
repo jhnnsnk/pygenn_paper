@@ -4,10 +4,10 @@ import matplotlib.pyplot as plt
 from pygenn import genn_model, genn_wrapper
 from scipy.stats import norm
 from six import iteritems, itervalues
-from time import perf_counter
+from time import perf_counter_ns
 import sys
 
-time_start = perf_counter()
+time_start = perf_counter_ns()
 # ----------------------------------------------------------------------------
 # Parameters
 # ----------------------------------------------------------------------------
@@ -175,7 +175,7 @@ model.default_sparse_connectivity_location = genn_wrapper.VarLocation_DEVICE
 model._model.set_seed(RNGSEED)
 print("Seed: ", model._model.get_seed())
 
-time_network = perf_counter()
+time_network = perf_counter_ns()
 
 lif_init = {"V": genn_model.init_var("Normal", {"mean": -58.0, "sd": 5.0}), "RefracTime": 0.0}
 poisson_init = {"current": 0.0}
@@ -228,7 +228,7 @@ for layer in LAYER_NAMES:
         # Add neuron population to dictionary
         neuron_populations[pop_name] = neuron_pop
 
-time_create = perf_counter()
+time_create = perf_counter_ns()
 
 # Loop through target populations and layers
 print("Creating synapse populations:")
@@ -323,21 +323,21 @@ for trg_layer in LAYER_NAMES:
                             syn_pop.pop.set_num_threads_per_spike(NUM_THREADS_PER_SPIKE)
 print("Total neurons=%u, total synapses=%u" % (total_neurons, total_synapses))
 
-time_connect = perf_counter()
+time_connect = perf_counter_ns()
 
 if BUILD_MODEL:
     print("Building Model")
     model.build()
 
 # model building
-time_code_generation = perf_counter()
+time_code_generation = perf_counter_ns()
 
 print("Loading Model")
 duration_timesteps = int(round(PRESIM_DURATION_MS + DURATION_MS / DT_MS))
 model.load(num_recording_timesteps=duration_timesteps)
 
 # model loading
-time_load = perf_counter()
+time_load = perf_counter_ns()
 
 print("Simulating")
 ten_percent_timestep = duration_timesteps // 10
@@ -348,7 +348,7 @@ pop_spikes = [[pop, []]
 
 # Loop through timesteps
 # presimulation
-presim_start_time = perf_counter()
+presim_start_time = perf_counter_ns()
 while model.t < PRESIM_DURATION_MS:
     # Advance simulation
     model.step_time()
@@ -365,7 +365,7 @@ while model.t < PRESIM_DURATION_MS:
             # Add to data structure
     #        spikes[1].append(np.copy(spikes[0].current_spikes))
 
-presim_end_time =  perf_counter()
+presim_end_time =  perf_counter_ns()
 
 # Loop through timesteps
 while model.t < DURATION_MS:
@@ -384,28 +384,28 @@ while model.t < DURATION_MS:
             # Add to data structure
     #        spikes[1].append(np.copy(spikes[0].current_spikes))
 
-sim_end_time =  perf_counter()
+sim_end_time =  perf_counter_ns()
 
 # Download recording data
 #if USE_GENN_RECORDING:
 #    model.pull_recording_buffers_from_device()
 
 print("Timing:")
-print("\tTotal time:%f" % ((sim_end_time - time_start)*1000.0))
+print("\tTotal time:%f" % ((sim_end_time - time_start)))
 
-print("\tInitialize:%f" % ((time_network - time_start)*1000.0))
-print("\tCreate:%f" % ((time_create - time_network)*1000.0))
-print("\tConnect:%f" % ((time_connect - time_create)*1000.0))
-print("\tBuilding:%f" % ((time_code_generation - time_connect)*1000.0))
-print("\tLoading:%f" % ((time_load - time_code_generation)*1000.0))
-print("\tPre-simulation:%f" % ((presim_end_time - presim_start_time) * 1000.0))
-print("\tSimulation:%f" % ((sim_end_time - presim_end_time) * 1000.0))
+print("\tInitialize:%f" % ((time_network - time_start)))
+print("\tCreate:%f" % ((time_create - time_network)))
+print("\tConnect:%f" % ((time_connect - time_create)))
+print("\tBuilding:%f" % ((time_code_generation - time_connect)))
+print("\tLoading:%f" % ((time_load - time_code_generation)))
+print("\tPre-simulation:%f" % ((presim_end_time - presim_start_time)))
+print("\tSimulation:%f" % ((sim_end_time - presim_end_time)))
 
 import json
-times = {"Total time": ((sim_end_time - time_start)*1000.0), "Time to initialize": ((time_network - time_start)*1000.0),
-         "Time to create": ((time_create - time_network)*1000.0), "Time to connect": ((time_connect - time_create)*1000.0),
-         "Time to build": ((time_code_generation - time_connect)*1000.0), "Time to load": ((time_load - time_code_generation)*1000.0),
-         "Time to pre-simulate": ((presim_end_time - presim_start_time) * 1000.0), "Time to simulate": ((sim_end_time - presim_end_time) * 1000.0)}
+times = {"Total time": ((sim_end_time - time_start)), "Time to initialize": ((time_network - time_start)),
+         "Time to create": ((time_create - time_network)), "Time to connect": ((time_connect - time_create)),
+         "Time to build": ((time_code_generation - time_connect)), "Time to load": ((time_load - time_code_generation)),
+         "Time to pre-simulate": ((presim_end_time - presim_start_time)), "Time to simulate": ((sim_end_time - presim_end_time))}
 
 with open('eval_genn_simulation_data.json', 'w') as fp:
     json.dump(times, fp)
