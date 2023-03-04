@@ -391,7 +391,7 @@ time_dict = {
         "time_connect": time_connect - time_create,
         "time_build": time_build - time_connect,
         "time_load": time_load - time_build,
-        "time_presimulate": time_presimulate - time_connect,
+        "time_presimulate": time_presimulate - time_load,
         "time_simulate": time_simulate - time_presimulate,
         "time_total": time_simulate - time_start,
         }
