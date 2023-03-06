@@ -39,9 +39,6 @@ POPULATION_NAMES = ["E", "I"]
 # Simulation timestep [ms]
 DT_MS = 0.1
 
-# Presimulation duration [ms]
-PRESIM_DURATION_MS = 500.0
-
 # Simulation duration [ms]
 DURATION_MS = 10000.0
 
@@ -349,28 +346,13 @@ if BUILD_MODEL:
 time_build = perf_counter_ns()
 
 print("Loading Model")
-duration_timesteps = int(round(PRESIM_DURATION_MS + DURATION_MS / DT_MS))
+duration_timesteps = int(round(DURATION_MS / DT_MS))
 model.load(num_recording_timesteps=duration_timesteps)
 
 # model loading
 time_load = perf_counter_ns()
 
-print("Pre-Simulating")
 ten_percent_timestep = duration_timesteps // 10
-
-# Loop through timesteps
-# presimulation
-while model.t < PRESIM_DURATION_MS:
-    # Advance simulation
-    model.step_time()
-
-    # Indicate every 10%
-    if PRINT_TIME and (model.timestep % ten_percent_timestep) == 0:
-        print("%u%%" % (model.timestep / 100))
-
-time_presimulate =  perf_counter_ns()
-
-
 print("Simulating")
 
 # Simulation
@@ -391,8 +373,7 @@ time_dict = {
         "time_connect": time_connect - time_create,
         "time_build": time_build - time_connect,
         "time_load": time_load - time_build,
-        "time_presimulate": time_presimulate - time_load,
-        "time_simulate": time_simulate - time_presimulate,
+        "time_simulate": time_simulate - time_load,
         "time_total": time_simulate - time_start,
         }
 
