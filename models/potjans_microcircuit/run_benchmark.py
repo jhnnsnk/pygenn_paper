@@ -26,7 +26,6 @@ RNGSEED = args.seed
 print(f"Arguments: {args}")
 
 
-time_start = perf_counter_ns()
 # ----------------------------------------------------------------------------
 # Parameters
 # ----------------------------------------------------------------------------
@@ -178,7 +177,9 @@ def get_full_mean_input_current(layer, pop):
     return mean_input_current
 
 
-time_init = perf_counter_ns()
+time_start = perf_counter_ns()
+
+
 # ----------------------------------------------------------------------------
 # Network creation
 # ----------------------------------------------------------------------------
@@ -340,6 +341,7 @@ for trg_layer in LAYER_NAMES:
                             syn_pop.pop.set_num_threads_per_spike(NUM_THREADS_PER_SPIKE)
 print("Total neurons=%u, total synapses=%u" % (total_neurons, total_synapses))
 
+# model definition
 time_model_def = perf_counter_ns()
 
 if BUILD_MODEL:
@@ -372,8 +374,7 @@ while model.t < DURATION_MS:
 time_simulate =  perf_counter_ns()
 
 time_dict = {
-        "time_initialize": time_init - time_start,
-        "time_model_def": time_model_def - time_init,
+        "time_model_def": time_model_def - time_start,
         "time_build": time_build - time_model_def,
         "time_load": time_load - time_build,
         "time_simulate": time_simulate - time_load,
