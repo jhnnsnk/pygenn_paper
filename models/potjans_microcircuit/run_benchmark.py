@@ -44,7 +44,7 @@ DURATION_MS = 10000.0
 
 # set to false because we use our timers
 # Should kernel timing be measured?
-MEASURE_TIMING = False
+MEASURE_TIMING = True
 
 # Should we use procedural rather than in-memory connectivity?
 PROCEDURAL_CONNECTIVITY = False
@@ -177,6 +177,8 @@ def get_full_mean_input_current(layer, pop):
     assert mean_input_current >= 0.0
     return mean_input_current
 
+
+time_init = perf_counter_ns()
 # ----------------------------------------------------------------------------
 # Network creation
 # ----------------------------------------------------------------------------
@@ -191,7 +193,6 @@ model.default_sparse_connectivity_location = genn_wrapper.VarLocation_DEVICE
 model._model.set_seed(RNGSEED)
 print("Seed: ", model._model.get_seed())
 
-time_network = perf_counter_ns()
 
 lif_init = {"V": genn_model.init_var("Normal", {"mean": -58.0, "sd": 5.0}), "RefracTime": 0.0}
 poisson_init = {"current": 0.0}
@@ -240,8 +241,6 @@ for layer in LAYER_NAMES:
 
         # Add neuron population to dictionary
         neuron_populations[pop_name] = neuron_pop
-
-time_create = perf_counter_ns()
 
 # Loop through target populations and layers
 print("Creating synapse populations:")
@@ -336,7 +335,7 @@ for trg_layer in LAYER_NAMES:
                             syn_pop.pop.set_num_threads_per_spike(NUM_THREADS_PER_SPIKE)
 print("Total neurons=%u, total synapses=%u" % (total_neurons, total_synapses))
 
-time_connect = perf_counter_ns()
+time_model_def = perf_counter_ns()
 
 if BUILD_MODEL:
     print("Building Model")
@@ -368,10 +367,9 @@ while model.t < DURATION_MS:
 time_simulate =  perf_counter_ns()
 
 time_dict = {
-        "time_network": time_network - time_start,
-        "time_create": time_create - time_network,
-        "time_connect": time_connect - time_create,
-        "time_build": time_build - time_connect,
+        "time_initialize": time_init - time_start,
+        "time_model_def": time_model_def - time_init,
+        "time_build": time_build - time_model_def,
         "time_load": time_load - time_build,
         "time_simulate": time_simulate - time_load,
         "time_total": time_simulate - time_start,
