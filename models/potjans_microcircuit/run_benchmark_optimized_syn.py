@@ -13,17 +13,18 @@ from json import dump, dumps
 # Get and check file path
 parser = ArgumentParser()
 parser.add_argument("file", type=str)
-parser.add_argument("--path", type=str, default=None)
+parser.add_argument("--path", type=str, default="../sim_output")
 parser.add_argument("--seed", type=int, default=12345)
 args = parser.parse_args()
 
 data_path = Path(args.path)
-
-file_name = args.file + ".json"
-file_path = data_path / file_name
+file_path = data_path / args.file
 assert data_path.is_dir() and not file_path.exists()
+# seed for RNGs
+RNGSEED = args.seed
 
 print(f"Arguments: {args}")
+
 
 # ----------------------------------------------------------------------------
 # Parameters
@@ -127,9 +128,6 @@ MEAN_DELAY = {"E": 1.5, "I": 0.75}
 
 DELAY_SD = {"E": 0.75, "I": 0.375}
 
-# seed for RNGs
-RNGSEED = args.seed
-
 # Print time progress
 PRINT_TIME = False
 
@@ -179,7 +177,6 @@ def get_full_mean_input_current(layer, pop):
     return mean_input_current
 
 
-# Start timing
 time_start = perf_counter_ns()
 
 
@@ -197,8 +194,11 @@ model.default_sparse_connectivity_location = genn_wrapper.VarLocation_DEVICE
 model._model.set_seed(RNGSEED)
 print("Seed: ", model._model.get_seed())
 
+# added optimized option for membrane potential initialization
+optimized_mean = [-68.28, -63.16, -63.33, -63.45, -63.11, -61.66, -66.72, -61.43]
+optimized_std = [5.36, 4.57, 4.74, 4.94, 4.94, 4.55, 5.46, 4.48]
+#lif_init = {"V": genn_model.init_var("Normal", {"mean": -58.0, "sd": 5.0}), "RefracTime": 0.0}
 
-lif_init = {"V": genn_model.init_var("Normal", {"mean": -58.0, "sd": 5.0}), "RefracTime": 0.0}
 poisson_init = {"current": 0.0}
 
 exp_curr_params = {"tau": 0.5}
@@ -217,10 +217,12 @@ print("Max dendritic delay slots:%d" % max_dendritic_delay_slots)
 print("Creating neuron populations:")
 total_neurons = 0
 neuron_populations = {}
+dum = 0
 for layer in LAYER_NAMES:
     for pop in POPULATION_NAMES:
         pop_name = layer + pop
-
+        lif_init = {"V": genn_model.init_var("Normal", {"mean": optimized_mean[dum], "sd": optimized_std[dum]}), "RefracTime": 0.0}
+        dum+=1
         # Calculate external input rate, weight and current
         ext_input_rate = NUM_EXTERNAL_INPUTS[layer][pop] * CONNECTIVITY_SCALING_FACTOR * BACKGROUND_RATE
         ext_weight = EXTERNAL_W / np.sqrt(CONNECTIVITY_SCALING_FACTOR)
@@ -339,28 +341,22 @@ for trg_layer in LAYER_NAMES:
                             syn_pop.pop.set_num_threads_per_spike(NUM_THREADS_PER_SPIKE)
 print("Total neurons=%u, total synapses=%u" % (total_neurons, total_synapses))
 
-
-# Time to model definition
+# model definition
 time_model_def = perf_counter_ns()
-
 
 if BUILD_MODEL:
     print("Building Model")
     model.build()
 
-
-# Time to build model
+# model building
 time_build = perf_counter_ns()
-
 
 print("Loading Model")
 duration_timesteps = int(round(DURATION_MS / DT_MS))
 model.load(num_recording_timesteps=duration_timesteps)
 
-
-# Time to load model
+# model loading
 time_load = perf_counter_ns()
-
 
 ten_percent_timestep = duration_timesteps // 10
 print("Simulating")
@@ -375,26 +371,17 @@ while model.t < DURATION_MS:
     if PRINT_TIME and (model.timestep % ten_percent_timestep) == 0:
         print("%u%%" % (model.timestep / 100))
 
-
-# Time to simulate
 time_simulate =  perf_counter_ns()
-
 
 time_dict = {
         "time_model_def": time_model_def - time_start,
         "time_build": time_build - time_model_def,
-        "time_construct_no_load": time_build - time_start,
         "time_load": time_load - time_build,
-        "time_construct": time_load - time_start,
         "time_simulate": time_simulate - time_load,
         "time_total": time_simulate - time_start,
         }
 
 info_dict = {
-        "conf": {
-            "seed": args.seed,
-            "num_neurons": total_neurons
-        },
         "timers": time_dict
     }
 
