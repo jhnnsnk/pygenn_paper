@@ -13,18 +13,17 @@ from json import dump, dumps
 # Get and check file path
 parser = ArgumentParser()
 parser.add_argument("file", type=str)
-parser.add_argument("--path", type=str, default="../sim_output")
+parser.add_argument("--path", type=str, default=None)
 parser.add_argument("--seed", type=int, default=12345)
 args = parser.parse_args()
 
 data_path = Path(args.path)
-file_path = data_path / args.file
+
+file_name = args.file + ".json"
+file_path = data_path / file_name
 assert data_path.is_dir() and not file_path.exists()
-# seed for RNGs
-RNGSEED = args.seed
 
 print(f"Arguments: {args}")
-
 
 # ----------------------------------------------------------------------------
 # Parameters
@@ -128,6 +127,9 @@ MEAN_DELAY = {"E": 1.5, "I": 0.75}
 
 DELAY_SD = {"E": 0.75, "I": 0.375}
 
+# seed for RNGs
+RNGSEED = args.seed
+
 # Print time progress
 PRINT_TIME = False
 
@@ -177,6 +179,7 @@ def get_full_mean_input_current(layer, pop):
     return mean_input_current
 
 
+# Start timing
 time_start = perf_counter_ns()
 
 
@@ -341,22 +344,28 @@ for trg_layer in LAYER_NAMES:
                             syn_pop.pop.set_num_threads_per_spike(NUM_THREADS_PER_SPIKE)
 print("Total neurons=%u, total synapses=%u" % (total_neurons, total_synapses))
 
-# model definition
+
+# Time to model definition
 time_model_def = perf_counter_ns()
+
 
 if BUILD_MODEL:
     print("Building Model")
     model.build()
 
-# model building
+
+# Time to build model
 time_build = perf_counter_ns()
+
 
 print("Loading Model")
 duration_timesteps = int(round(DURATION_MS / DT_MS))
 model.load(num_recording_timesteps=duration_timesteps)
 
-# model loading
+
+# Time to load model
 time_load = perf_counter_ns()
+
 
 ten_percent_timestep = duration_timesteps // 10
 print("Simulating")
@@ -371,17 +380,26 @@ while model.t < DURATION_MS:
     if PRINT_TIME and (model.timestep % ten_percent_timestep) == 0:
         print("%u%%" % (model.timestep / 100))
 
+
+# Time to simulate
 time_simulate =  perf_counter_ns()
+
 
 time_dict = {
         "time_model_def": time_model_def - time_start,
         "time_build": time_build - time_model_def,
+        "time_construct_no_load": time_build - time_start,
         "time_load": time_load - time_build,
+        "time_construct": time_load - time_start,
         "time_simulate": time_simulate - time_load,
         "time_total": time_simulate - time_start,
         }
 
 info_dict = {
+        "conf": {
+            "seed": args.seed,
+            "num_neurons": total_neurons
+        },
         "timers": time_dict
     }
 

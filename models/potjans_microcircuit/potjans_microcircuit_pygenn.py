@@ -4,10 +4,8 @@ import matplotlib.pyplot as plt
 from pygenn import genn_model, genn_wrapper
 from scipy.stats import norm
 from six import iteritems, itervalues
-from time import perf_counter_ns
+from time import perf_counter
 import sys
-
-time_start = perf_counter_ns()
 # ----------------------------------------------------------------------------
 # Parameters
 # ----------------------------------------------------------------------------
@@ -20,18 +18,11 @@ POPULATION_NAMES = ["E", "I"]
 # Simulation timestep [ms]
 DT_MS = 0.1
 
-# Presimulation duration [ms]
-PRESIM_DURATION_MS = 500.0
-
 # Simulation duration [ms]
-DURATION_MS = 10000.0
+DURATION_MS = 1000.0
 
-# seed for RNGs
-RNGSEED = 12349
-
-# set to false because we use our timers
 # Should kernel timing be measured?
-MEASURE_TIMING = False
+MEASURE_TIMING = True
 
 # Should we use procedural rather than in-memory connectivity?
 PROCEDURAL_CONNECTIVITY = False
@@ -171,12 +162,6 @@ model._model.set_default_narrow_sparse_ind_enabled(True)
 model.timing_enabled = MEASURE_TIMING
 model.default_var_location = genn_wrapper.VarLocation_DEVICE
 model.default_sparse_connectivity_location = genn_wrapper.VarLocation_DEVICE
-# set seed for RNGs
-model._model.set_seed(RNGSEED)
-print("Seed: ", model._model.get_seed())
-
-
-time_network = perf_counter_ns()
 
 lif_init = {"V": genn_model.init_var("Normal", {"mean": -58.0, "sd": 5.0}), "RefracTime": 0.0}
 poisson_init = {"current": 0.0}
@@ -228,8 +213,6 @@ for layer in LAYER_NAMES:
 
         # Add neuron population to dictionary
         neuron_populations[pop_name] = neuron_pop
-
-time_create = perf_counter_ns()
 
 # Loop through target populations and layers
 print("Creating synapse populations:")
@@ -324,21 +307,13 @@ for trg_layer in LAYER_NAMES:
                             syn_pop.pop.set_num_threads_per_spike(NUM_THREADS_PER_SPIKE)
 print("Total neurons=%u, total synapses=%u" % (total_neurons, total_synapses))
 
-time_connect = perf_counter_ns()
-
 if BUILD_MODEL:
     print("Building Model")
     model.build()
 
-# model building
-time_code_generation = perf_counter_ns()
-
 print("Loading Model")
-duration_timesteps = int(round(PRESIM_DURATION_MS + DURATION_MS / DT_MS))
+duration_timesteps = int(round(DURATION_MS / DT_MS))
 model.load(num_recording_timesteps=duration_timesteps)
-
-# model loading
-time_load = perf_counter_ns()
 
 print("Simulating")
 ten_percent_timestep = duration_timesteps // 10
@@ -348,27 +323,7 @@ pop_spikes = [[pop, []]
               for pop in itervalues(neuron_populations)]
 
 # Loop through timesteps
-# presimulation
-presim_start_time = perf_counter_ns()
-while model.t < PRESIM_DURATION_MS:
-    # Advance simulation
-    model.step_time()
-
-    # Indicate every 10%
-    #if (model.timestep % ten_percent_timestep) == 0:
-    #    print("%u%%" % (model.timestep / 100))
-
-    if not USE_GENN_RECORDING:
-        for i, spikes in enumerate(pop_spikes):
-            # Download spikes
-            spikes[0].pull_current_spikes_from_device()
-
-            # Add to data structure
-            spikes[1].append(np.copy(spikes[0].current_spikes))
-
-presim_end_time =  perf_counter_ns()
-
-# Loop through timesteps
+sim_start_time = perf_counter()
 while model.t < DURATION_MS:
     # Advance simulation
     model.step_time()
@@ -385,7 +340,7 @@ while model.t < DURATION_MS:
             # Add to data structure
             spikes[1].append(np.copy(spikes[0].current_spikes))
 
-sim_end_time =  perf_counter_ns()
+sim_end_time =  perf_counter()
 
 
 # Download recording data
@@ -393,34 +348,14 @@ if USE_GENN_RECORDING:
     model.pull_recording_buffers_from_device()
 
 print("Timing:")
-print("\tTotal time:%f" % ((sim_end_time - time_start)))
-
-print("\tInitialize:%f" % ((time_network - time_start)))
-print("\tCreate:%f" % ((time_create - time_network)))
-print("\tConnect:%f" % ((time_connect - time_create)))
-print("\tBuilding:%f" % ((time_code_generation - time_connect)))
-print("\tLoading:%f" % ((time_load - time_code_generation)))
-print("\tPre-simulation:%f" % ((presim_end_time - presim_start_time)))
-print("\tSimulation:%f" % ((sim_end_time - presim_end_time)))
-
-import json
-times = {"Total time": ((sim_end_time - time_start)), "Time to initialize": ((time_network - time_start)),
-         "Time to create": ((time_create - time_network)), "Time to connect": ((time_connect - time_create)),
-         "Time to build": ((time_code_generation - time_connect)), "Time to load": ((time_load - time_code_generation)),
-         "Time to pre-simulate": ((presim_end_time - presim_start_time)), "Time to simulate": ((sim_end_time - presim_end_time))}
-
-with open('genn_simulation_data.json', 'w') as fp:
-    json.dump(times, fp)
-
-#sys.exit(0)
+print("\tSimulation:%f" % ((sim_end_time - sim_start_time) * 1000.0))
+sys.exit(0)
 if MEASURE_TIMING:
     print("\tInit:%f" % (1000.0 * model.init_time))
     print("\tSparse init:%f" % (1000.0 * model.init_sparse_time))
     print("\tNeuron simulation:%f" % (1000.0 * model.neuron_update_time))
     print("\tSynapse simulation:%f" % (1000.0 * model.presynaptic_update_time))
-    print("\tOverall time:%f" % (1000.0 * (model.presynaptic_update_time + model.neuron_update_time + 
-                                          model.init_sparse_time + model.init_time)))
-sys.exit(0)
+
 
 # Create plot
 figure, axes = plt.subplots(1, 2)
