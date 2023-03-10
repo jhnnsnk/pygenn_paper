@@ -198,7 +198,9 @@ model._model.set_seed(RNGSEED)
 print("Seed: ", model._model.get_seed())
 
 
-lif_init = {"V": genn_model.init_var("Normal", {"mean": -58.0, "sd": 5.0}), "RefracTime": 0.0}
+# added optimized option for membrane potential initialization
+optimized_mean = [-68.28, -63.16, -63.33, -63.45, -63.11, -61.66, -66.72, -61.43]
+optimized_std = [5.36, 4.57, 4.74, 4.94, 4.94, 4.55, 5.46, 4.48]
 poisson_init = {"current": 0.0}
 
 exp_curr_params = {"tau": 0.5}
@@ -217,9 +219,12 @@ print("Max dendritic delay slots:%d" % max_dendritic_delay_slots)
 print("Creating neuron populations:")
 total_neurons = 0
 neuron_populations = {}
+counter = 0
 for layer in LAYER_NAMES:
     for pop in POPULATION_NAMES:
         pop_name = layer + pop
+        lif_init = {"V": genn_model.init_var("Normal", {"mean": optimized_mean[counter], "sd": optimized_std[counter]}), "RefracTime": 0.0}
+        counter += 1
 
         # Calculate external input rate, weight and current
         ext_input_rate = NUM_EXTERNAL_INPUTS[layer][pop] * CONNECTIVITY_SCALING_FACTOR * BACKGROUND_RATE
